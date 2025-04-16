@@ -1,4 +1,9 @@
 const express = require('express');
+const multer = require('multer');
+const axios = require('axios');
+const FormData = require('form-data');
+const fs = require('fs');
+const path = require('path');
 const router = express.Router();
 const Job = require('../models/job');
 const Category = require('../models/category');
@@ -6,6 +11,8 @@ const User = require("../models/User.model");
 const Application = require("../models/applications");
 const upload = require("../middlewares/uploadMiddleware");
 const authMiddleware = require("../middlewares/authMiddleware");
+// L'URL de votre service Flask (à remplacer par l'URL ngrok générée)
+const FLASK_SERVICE_URL = 'https://ae8a-34-86-117-199.ngrok-free.app/upload';
 
 // 🟢 1. Ajouter un Job
 router.post('/jobs', async (req, res) => {
@@ -30,17 +37,60 @@ router.post('/jobs', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-//get all jobs
 router.get('/jobs', async (req, res) => {
   try {
-    const jobs = await Job.find().populate('category', 'name');
-    console.log("Jobs trouvés:", jobs); // Log des résultats
+    const { category, jobType, location, postedWithin } = req.query;
+    console.log("jobType reçu:", jobType);
+    
+    // Construction dynamique du filtre
+    let filter = {};
+    
+    // Filtre par catégorie
+    if (category) {
+      filter['category'] = category;
+    }
+    
+    // Filtre par type d'emploi (peut être multiple)
+   
+if (jobType) {
+  console.log("Type d'emploi reçu:", jobType);
+  const jobTypes = jobType.split(',');
+  console.log("Types d'emploi après split:", jobTypes);
+  filter.jobType = { $in: jobTypes };
+  console.log("Filtre jobType appliqué:", filter.jobType);
+}
+    // Filtre par localisation
+    if (location) {
+      filter['location'] = location;
+    }
+    
+    // Filtre par date de publication
+   // Filter by posted date
+   if (postedWithin) {
+    const now = new Date();
+    const days = parseInt(postedWithin, 10);
+    
+    if (!isNaN(days) && days > 0) {
+      const fromDate = new Date();
+      fromDate.setDate(now.getDate() - days);
+      
+      filter['postedAt'] = { $gte: fromDate };
+      console.log("Date filter applied:", { from: fromDate, days });
+    }
+  }
+    
+    console.log("Filtres appliqués:", filter);
+    
+    const jobs = await Job.find(filter).populate('category', 'name');
+    
+    console.log("Jobs trouvés:", jobs.length);
     res.json(jobs);
   } catch (error) {
     console.error("Erreur:", error);
     res.status(500).json({ message: error.message });
   }
 });
+
 //get les 4 derniers job posted
 
 router.get('/jobs/recent', async (req, res) => {
@@ -151,6 +201,50 @@ router.get('/jobs/:id', async (req, res) => {
 
 // Postuler à un job
 
+// Route pour le bouton "MatchCV"
+// Route pour envoyer le CV et la description du poste à Flask
+
+router.post('/analyze-cv', upload.single('cv_file'), async (req, res) => {
+  try {
+    const { job_description } = req.body;
+    const cvFile = req.file;
+    
+    console.log("CV File reçu:", cvFile ? cvFile.originalname : "aucun");
+    console.log("Description du poste reçue:", job_description);
+    
+    if (!cvFile || !job_description) {
+      return res.status(400).json({ error: 'CV et description du poste requis' });
+    }
+    
+    // Préparer les données pour le service Flask
+    const formData = new FormData();
+    formData.append('cv_file', fs.createReadStream(cvFile.path), cvFile.originalname);
+    formData.append('job_description', job_description);
+    
+    console.log("FormData prêt, envoi à:", FLASK_SERVICE_URL);
+    
+    // Appeler le service Flask
+    const response = await axios.post(FLASK_SERVICE_URL, formData, {
+      headers: {
+        ...formData.getHeaders()
+      }
+    });
+    
+    console.log("Réponse reçue:", response.data);
+    
+    // Nettoyer le fichier temporaire
+    fs.unlinkSync(cvFile.path);
+    
+    // Renvoyer les résultats au frontend
+    return res.json(response.data);
+  } catch (error) {
+    console.error('Erreur lors de l\'analyse du CV:', error.message);
+    if (error.response) {
+      console.error('Réponse d\'erreur:', error.response.data);
+    }
+    return res.status(500).json({ error: 'Erreur lors de l\'analyse du CV' });
+  }
+});
 
 
 

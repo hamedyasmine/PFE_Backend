@@ -17,6 +17,7 @@ const counterRoutes = require("./src/routes/counterRoutes");
 const infoRoutes = require("./src/routes/infoRoutes");
 const placesRoutes = require('./src/routes/placeRoutes');
 const questionRoutes = require("./src/routes/questions");
+
 const app = express();
 
 // 📂 Vérifier et créer le dossier `uploads/cvs_simplifies/` s'il n'existe pas
@@ -48,6 +49,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api", categoryRoutes);
 app.use("/api", jobRoutes);
 app.use("/api", contactRoutes);
+
 
 app.use("/api/counters", counterRoutes);
 

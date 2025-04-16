@@ -4,6 +4,8 @@ const authMiddleware = require("../middlewares/authMiddleware");
 const Application = require("../models/applications");
 const Job = require("../models/job");
 const Question = require("../models/Question");
+const InterviewAnswer = require("../models/InterviewAnswer");
+
 
 const router = express.Router();
 
@@ -126,10 +128,19 @@ router.get("/my-applications", authMiddleware, async (req, res) => {
         jobType: job.jobType,
       };
 
+      // Déclare enrichedApp comme un objet vide
       const enrichedApp = {
-        ...application._doc,
-        job: jobInfo,
+        ...application._doc, // Ajoute les propriétés de la candidature
+        job: jobInfo, // Ajoute les informations du job
       };
+
+      // Cherche si l'utilisateur a déjà passé l'entretien pour ce job
+      const existingInterview = await InterviewAnswer.findOne({
+        userId: req.user.id,
+        jobId: job._id,
+      });
+
+      enrichedApp.interviewPassed = !!existingInterview; // true ou false
 
       if (application.status === 'accepted') {
         // 🧠 Calculer la date limite
@@ -142,7 +153,7 @@ router.get("/my-applications", authMiddleware, async (req, res) => {
         enrichedApp.deadlineMessage = deadlineMessage;
       }
 
-      enrichedApplications.push(enrichedApp);
+      enrichedApplications.push(enrichedApp); // Ajoute la candidature enrichie au tableau
     }
 
     res.json(enrichedApplications);
@@ -151,6 +162,7 @@ router.get("/my-applications", authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Erreur lors de la récupération des candidatures.' });
   }
 });
+
 
 
 

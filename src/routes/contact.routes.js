@@ -34,6 +34,23 @@ router.get('/contact/messages', async (req, res) => {
   }
 });
 
+// PATCH - Marquer ou démarcher un message comme important
+// PATCH pour mettre à jour isImportant
+router.patch('/messages/:id', async (req, res) => {
+  try {
+    const updated = await Message.findByIdAndUpdate(
+      req.params.id,
+      { isImportant: req.body.isImportant },
+      { new: true }
+    );
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+
+
 // Supprimer un message par ID
 router.delete('/contact/messages/:id', async (req, res) => {
   try {
@@ -48,5 +65,6 @@ router.delete('/contact/messages/:id', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 
 module.exports = router;
